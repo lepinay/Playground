@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground.Tests", "Playground.Tests\Playground.Tests.csproj", "{15112E5B-A4A3-4095-B657-EC234781D6BC}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tutorial1", "Tutorial1\Tutorial1.fsproj", "{E57C015C-0872-45CC-8025-E2F52D83F0E7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{15112E5B-A4A3-4095-B657-EC234781D6BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15112E5B-A4A3-4095-B657-EC234781D6BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15112E5B-A4A3-4095-B657-EC234781D6BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15112E5B-A4A3-4095-B657-EC234781D6BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E57C015C-0872-45CC-8025-E2F52D83F0E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E57C015C-0872-45CC-8025-E2F52D83F0E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E57C015C-0872-45CC-8025-E2F52D83F0E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E57C015C-0872-45CC-8025-E2F52D83F0E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

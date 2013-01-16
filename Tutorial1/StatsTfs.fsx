@@ -704,15 +704,14 @@ module TFS =
 //        printfn "%A" c
 // float(m.Statistics.BlocksCovered) / float(m.Statistics.BlocksCovered+m.Statistics.BlocksNotCovered)
     
-
+    let allChangesets = history |> Seq.map(fun h-> h.ChangesetId) |> Seq.take 3
     
-    let averageCoverage = 
-        let allChangesets = history |> Seq.map(fun h-> new ChangesetVersionSpec(h.ChangesetId)) |> Seq.take 3
+    let coverageForChangeset (changeset:int) = 
         let checkoutFolder = @"c:/temp/yo3/"
         let sourceFolder = "$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe"
         if Directory.Exists(checkoutFolder) then Directory.Delete(checkoutFolder, true)
         Directory.CreateDirectory(checkoutFolder) |> ignore
-        vc.GetItems(sourceFolder, Seq.head(allChangesets) ,RecursionType.Full).Items 
+        vc.GetItems(sourceFolder, new ChangesetVersionSpec(changeset) ,RecursionType.Full).Items 
             |> Seq.filter( fun i -> i.ItemType = ItemType.File) 
             |> Seq.iter( fun i -> printfn "%A" i; i.DownloadFile(checkoutFolder + i.ServerItem ))
         let msbuild = System.Diagnostics.Process.Start(@"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe", @""""+ checkoutFolder + @"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/OrderPipe.sln""")
@@ -740,6 +739,15 @@ module TFS =
                 let totalCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksCovered) 
                 let totalNotCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksNotCovered) 
                 float totalCovered / float(totalCovered+totalNotCovered)
+
+    let rec averageCoverage (changesets:list<int>) coverageForChangeset results : list<float> = 
+        match changesets with
+            | [] -> results
+            | changeset::xs -> 
+                let r = float(coverageForChangeset changeset) :: results
+                averageCoverage xs coverageForChangeset r
+                    
+    let cov:list<float> = averageCoverage (allChangesets |> Seq.toList) coverageForChangeset []
 
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
 //    let teamProject = tm.GetTeamProject("Front Office 5.0")

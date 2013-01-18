@@ -115,39 +115,47 @@ module TFS =
 
     
 
-    type progressResult = { 
-        date:System.DateTime
-        value:float
-        author:string
-        totalCovered:uint32
-        totalNotCovered:uint32
-        progress:int
-    }
+    type progressResult = 
+        { 
+            date:System.DateTime
+            value:float
+            author:string
+            totalCovered:uint32
+            totalNotCovered:uint32
+            progress:int
+            cumul:int
+        }
 
-    let rec progressReport (resultin:list<coverageResult>) :list<progressResult> = 
+    let rec progressReport (resultin:list<coverageResult>) (prev:coverageResult option) (cumul:int) :list<progressResult> = 
         match resultin with
             | [] -> []
-            | prev::queue ->
-                match queue with
-                    | curr::tail -> {
-                                        date=curr.date
-                                        value=curr.value
-                                        author=curr.author
-                                        totalCovered=curr.totalCovered
-                                        totalNotCovered=curr.totalNotCovered
-                                        progress=(int(curr.totalCovered)-int(prev.totalCovered))-(int(curr.totalNotCovered)-int(prev.totalNotCovered))
-                                      }::progressReport tail
-                    | [] -> [{
-                             progressResult.date=prev.date
-                             progressResult.value=prev.value
-                             progressResult.author=prev.author
-                             progressResult.totalCovered=prev.totalCovered
-                             progressResult.totalNotCovered=prev.totalNotCovered
-                             progressResult.progress=int prev.totalCovered-int prev.totalNotCovered
-                            }]
+            | head::queue ->
+                let progress = 
+                    match prev with
+                                |None -> int head.totalCovered - int head.totalNotCovered
+                                |Some prev -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
+                {
+                    date=head.date
+                    value=head.value
+                    author=head.author
+                    totalCovered=head.totalCovered
+                    totalNotCovered=head.totalNotCovered
+                    progress= progress
+                    cumul=cumul+progress
+                }::progressReport queue (Some(head)) (cumul+progress)
 
      //cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )   
-     (progressReport cov) |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A" c.date c.totalCovered c.totalNotCovered c.progress c.author )
+     let cov = 
+                [
+                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 10;totalNotCovered=uint32 10;author="a"}
+                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 15;totalNotCovered=uint32 12;author="b"}
+                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 16;totalNotCovered=uint32 12;author="c"}
+                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 16;totalNotCovered=uint32 12;author="c"}
+                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 20;totalNotCovered=uint32 12;author="c"}
+                ]
+
+     let r = progressReport cov None 0
+                 |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A %A" c.date c.totalCovered c.totalNotCovered c.progress c.author c.cumul )
 
 
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")

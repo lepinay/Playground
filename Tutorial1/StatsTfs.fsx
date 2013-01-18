@@ -704,20 +704,36 @@ module TFS =
 //        printfn "%A" c
 // float(m.Statistics.BlocksCovered) / float(m.Statistics.BlocksCovered+m.Statistics.BlocksNotCovered)
     
-    let allChangesets = history |> Seq.map(fun h-> h.ChangesetId) |> Seq.take 3
-    
-    let coverageForChangeset (changeset:int) = 
+    type ChangeSetDetail = {
+        id:int;
+        author:string;
+        date:System.DateTime;
+    }
+
+    let allChangesets = history |> Seq.map(fun h-> {id=h.ChangesetId;author=h.CommitterDisplayName;date=h.CreationDate}) |> Seq.take 30
+
+    type coverageResult = {
+        date:System.DateTime;
+        value:float;
+        author:string;
+        totalCovered:uint32;
+        totalNotCovered:uint32;
+    }
+
+    let coverageForChangeset (changeset:ChangeSetDetail) = 
         let checkoutFolder = @"c:/temp/yo3/"
         let sourceFolder = "$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe"
         if Directory.Exists(checkoutFolder) then Directory.Delete(checkoutFolder, true)
         Directory.CreateDirectory(checkoutFolder) |> ignore
-        vc.GetItems(sourceFolder, new ChangesetVersionSpec(changeset) ,RecursionType.Full).Items 
+        vc.GetItems(sourceFolder, new ChangesetVersionSpec(changeset.id) ,RecursionType.Full).Items 
             |> Seq.filter( fun i -> i.ItemType = ItemType.File) 
             |> Seq.iter( fun i -> printfn "%A" i; i.DownloadFile(checkoutFolder + i.ServerItem ))
         let msbuild = System.Diagnostics.Process.Start(@"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe", @""""+ checkoutFolder + @"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/OrderPipe.sln""")
         msbuild.WaitForExit()
         let tests = 
-                Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*tests*.dll", SearchOption.AllDirectories)
+                let tests = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*tests*.dll", SearchOption.AllDirectories)
+                let specs = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*specs.inmem.dll", SearchOption.AllDirectories)
+                Seq.append tests specs  
                 |> Seq.filter(fun f-> f.Contains("bin"))
                 |> Seq.map(fun f-> 
                                   printfn "%A" f
@@ -725,7 +741,7 @@ module TFS =
                 |> Seq.fold (fun a b -> a + " " + b) ""
 
         match tests with
-        | "" -> float 0
+        | "" -> {date=System.DateTime.Now;value=float 0;author="";totalCovered=0;totalNotCovered=0}
         | _ ->
                 let p = System.Diagnostics.Process.Start(@"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\mstest.exe", 
                                                      @"/runconfig:"""+checkoutFolder+"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/local.testsettings\" " +
@@ -738,17 +754,27 @@ module TFS =
                 let dataSet = ci.BuildDataSet();
                 let totalCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksCovered) 
                 let totalNotCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksNotCovered) 
-                float totalCovered / float(totalCovered+totalNotCovered)
+                {
+                    date=changeset.date;
+                    value=float totalCovered / float(totalCovered+totalNotCovered);
+                    author=changeset.author;
+                    totalCovered = totalCovered;
+                    totalNotCovered = totalNotCovered;
+                }
 
-    let rec averageCoverage (changesets:list<int>) coverageForChangeset results : list<float> = 
+
+
+
+    let rec averageCoverage (changesets:list<ChangeSetDetail>) (coverageForChangeset:ChangeSetDetail->coverageResult) results : list<coverageResult> = 
         match changesets with
             | [] -> results
             | changeset::xs -> 
-                let r = float(coverageForChangeset changeset) :: results
+                let r = coverageForChangeset changeset :: results
                 averageCoverage xs coverageForChangeset r
                     
-    let cov:list<float> = averageCoverage (allChangesets |> Seq.toList) coverageForChangeset []
+    let cov:list<coverageResult> = averageCoverage (allChangesets |> Seq.toList) coverageForChangeset []
 
+    cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
 //    let teamProject = tm.GetTeamProject("Front Office 5.0")
 //    let am = teamProject.CoverageAnalysisManager
@@ -770,7 +796,25 @@ module TFS =
 
     ()
 
-    
+#r "System.Data.dll"
+#r "FSharp.Data.TypeProviders.dll"
+#r "System.Data.Linq.dll"
+
+open System
+open System.Data
+open System.Data.Linq
+open Microsoft.FSharp.Data.TypeProviders
+open Microsoft.FSharp.Linq
+
+type dbSchema = SqlDataConnection<"Data Source=DEV-FRONT-SQL,1511;Initial Catalog=VPSPEED;Integrated Security=False;User Id=app_dev_front;Password=app_dev_front">
+let db = dbSchema.GetDataContext()    
+query {
+    for row in db.VP_T_Carts do
+    where (row.MemberId = 259)
+    sortBy row.CreationDate
+    select row
+} |> Seq.last
+
 
 #if COMPILED
 module BoilerPlateForForm = 

@@ -189,7 +189,7 @@ open System.Data.Linq
 open Microsoft.FSharp.Data.TypeProviders
 open Microsoft.FSharp.Linq
 
-type dbSchema = SqlDataConnection<"Data Source=DEV-FRONT-SQL,1511;Initial Catalog=VPSPEED;Integrated Security=False;User Id=app_dev_front;Password=app_dev_front">
+type dbSchema = SqlDataConnection<"">
 let db = dbSchema.GetDataContext()    
 query {
     for row in db.VP_T_Carts do

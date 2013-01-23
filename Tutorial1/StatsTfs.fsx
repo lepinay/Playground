@@ -75,6 +75,9 @@ module TFS =
                                              totalCovered=System.UInt32.Parse(totalCovered);
                                              totalNotCovered=System.UInt32.Parse(totalNotCovered)})
                                 | _ -> None )
+    let sortedCache = cache |> Seq.sortBy(fun c->c.Value.date)
+
+
 
     let coverageForChangeset (changeset:ChangeSetDetail) = 
         match cache |> Seq.tryFind ( fun c -> c.Value.id = changeset.id ) with
@@ -136,8 +139,6 @@ module TFS =
                                         })
 
 
-
-
     let rec averageCoverage (changesets:list<ChangeSetDetail>) (coverageForChangeset: ChangeSetDetail -> coverageResult option) results : list<coverageResult option> = 
         match changesets with
             | [] -> results
@@ -159,22 +160,22 @@ module TFS =
             progress:int
         }
 
-    let rec progressReport (resultin:list<coverageResult>) (prev:coverageResult option) :list<progressResult> = 
+    let rec progressReport (resultin:list<coverageResult option>) (prev:coverageResult option) :list<progressResult> = 
         match resultin with
             | [] -> []
             | head::queue ->
                 let progress = 
                     match prev with
                                 |None -> 0
-                                |Some prev -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
+                                |Some prev -> (int head.Value.totalCovered - int prev.totalCovered ) - (int head.Value.totalNotCovered - int prev.totalNotCovered)
                 {
-                    date=head.date
-                    value=head.value
-                    author=head.author
-                    totalCovered=head.totalCovered
-                    totalNotCovered=head.totalNotCovered
+                    date=head.Value.date
+                    value=head.Value.value
+                    author=head.Value.author
+                    totalCovered=head.Value.totalCovered
+                    totalNotCovered=head.Value.totalNotCovered
                     progress= progress
-                }::progressReport queue (Some(head)) 
+                }::progressReport queue (Some(head.Value)) 
 
      //cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )   
 //     let cov = 
@@ -186,16 +187,12 @@ module TFS =
 //                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 20;totalNotCovered=uint32 12;author="c"}
 //                ]
 
-     let r =
-        cov
-        |> Seq.groupBy(fun c -> c.author)
-        |> Seq.iter(fun (k, l) ->
-            progressReport (Seq.toList l) None
-                 |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A" c.date c.totalCovered c.totalNotCovered c.progress c.author  ) )
-      
       let r2 = 
-        (progressReport cov None )
-        |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A" c.date c.totalCovered c.totalNotCovered c.progress c.author ) 
+        (progressReport (Seq.toList sortedCache) None )
+        //|> Seq.filter(fun c-> System.Math.Abs(c.progress) < 250 )
+        //|> Seq.filter(fun c->c.author = "OREDIS-VP\mclement")
+        |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A" c.date c.totalCovered c.totalNotCovered c.progress c.author )
+        
 
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
 //    let teamProject = tm.GetTeamProject("Front Office 5.0")

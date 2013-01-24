@@ -56,31 +56,35 @@ module TFS =
             |> Seq.map(fun h-> {id=h.ChangesetId;author=h.Committer;date=h.CreationDate;comment=h.Comment}) 
 
     type coverageResult = {
-        id:int;
-        date:System.DateTime;
+        changeset:ChangeSetDetail
         value:float;
-        author:string;
         totalCovered:uint32;
         totalNotCovered:uint32;
     }
-    let cachePath = @"C:\Users\llepinay\Documents\Visual Studio 2012\Projects\Playground\Tutorial1\cache.txt"
+    let cachePath = @"D:\temp\Playground\Tutorial1\cache.txt"
     let cache = 
         System.IO.File.ReadLines(cachePath)
         |> Seq.map( fun l -> match l.Split(';') with
                                 |[|id;date;value;author;totalCovered;totalNotCovered|] 
-                                    -> Some({coverageResult.id=System.Int32.Parse(id);
-                                             date=System.DateTime.Parse(date);
+                                    -> Some({
+                                             coverageResult.changeset = 
+                                                {   
+                                                    id=System.Int32.Parse(id)
+                                                    date=System.DateTime.Parse(date)
+                                                    author=author;
+                                                    comment=""
+                                                };
                                              value=System.Double.Parse(value);
-                                             author=author;
                                              totalCovered=System.UInt32.Parse(totalCovered);
                                              totalNotCovered=System.UInt32.Parse(totalNotCovered)})
                                 | _ -> None )
-    let sortedCache = cache |> Seq.sortBy(fun c->c.Value.date)
+
+    let sortedCache = cache |> Seq.sortBy(fun c->c.Value.changeset.date)
 
 
 
     let coverageForChangeset (changeset:ChangeSetDetail) = 
-        match cache |> Seq.tryFind ( fun c -> c.Value.id = changeset.id ) with
+        match cache |> Seq.tryFind ( fun c -> c.Value.changeset.id = changeset.id ) with
             |Some(c) -> c
             |None ->
                     let checkoutFolder = @"c:/temp/yo3/"
@@ -103,7 +107,7 @@ module TFS =
                             |> Seq.fold (fun a b -> a + " " + b) ""
 
                     match tests with
-                    | "" -> Some({id=0;coverageResult.date=System.DateTime.Now;value=float 0;author="";totalCovered=uint32 0;totalNotCovered= uint32 0})
+                    | "" -> Some({changeset={id=0;date=System.DateTime.Now;author="";comment=""};value=float 0;totalCovered=uint32 0;totalNotCovered= uint32 0})
                     | _ ->
                             let p = System.Diagnostics.Process.Start(@"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\mstest.exe", 
                                                                  @"/runconfig:"""+checkoutFolder+"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/local.testsettings\" " +
@@ -130,10 +134,8 @@ module TFS =
                                                 totalNotCovered.ToString()
                                             ])
                                         Some({
-                                                coverageResult.id=changeset.id;
-                                                date=changeset.date;
+                                                changeset = changeset
                                                 value=coveragePct;
-                                                author=changeset.author;
                                                 totalCovered = totalCovered;
                                                 totalNotCovered = totalNotCovered;
                                         })
@@ -152,30 +154,23 @@ module TFS =
 
     type progressResult = 
         { 
-            date:System.DateTime
-            value:float
-            author:string
-            totalCovered:uint32
-            totalNotCovered:uint32
+            coverage:coverageResult
             progress:int
         }
 
     let rec progressReport (resultin:list<coverageResult option>) (prev:coverageResult option) :list<progressResult> = 
         match resultin with
             | [] -> []
-            | head::queue ->
+            | None::queue -> progressReport queue None
+            | Some head::queue ->
                 let progress = 
                     match prev with
                                 |None -> 0
-                                |Some prev -> (int head.Value.totalCovered - int prev.totalCovered ) - (int head.Value.totalNotCovered - int prev.totalNotCovered)
+                                |Some prev -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
                 {
-                    date=head.Value.date
-                    value=head.Value.value
-                    author=head.Value.author
-                    totalCovered=head.Value.totalCovered
-                    totalNotCovered=head.Value.totalNotCovered
+                    coverage=head
                     progress= progress
-                }::progressReport queue (Some(head.Value)) 
+                }::progressReport queue (Some(head))
 
      //cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )   
 //     let cov = 
@@ -187,12 +182,37 @@ module TFS =
 //                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 20;totalNotCovered=uint32 12;author="c"}
 //                ]
 
-      let r2 = 
-        (progressReport (Seq.toList sortedCache) None )
-        //|> Seq.filter(fun c-> System.Math.Abs(c.progress) < 250 )
-        //|> Seq.filter(fun c->c.author = "OREDIS-VP\mclement")
-        |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A" c.date c.totalCovered c.totalNotCovered c.progress c.author )
-        
+    let makereportFromCache c = 
+        (progressReport (Seq.toList c) None )
+
+    let printReport r = 
+        r
+        |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A %A" c.coverage.changeset.date c.coverage.totalCovered c.coverage.totalNotCovered c.progress c.coverage.changeset.author c.coverage.changeset.id )       
+
+
+    let cleanCache cache =
+        let report = makereportFromCache cache
+        printReport report
+        let dodgyIds = 
+            report
+            |> List.filter(fun c-> System.Math.Abs(c.progress) >= 100 )
+        match dodgyIds with
+            | [] -> cache
+            | _ -> cache |> Seq.filter( fun c-> not( dodgyIds |> Seq.exists (fun d -> d.coverage.changeset.id = c.Value.changeset.id) ) )
+    
+    let appendLinesToFile file lines = System.IO.File.AppendAllLines(file, lines)
+
+    sortedCache 
+    |> Seq.map(fun c-> match c with
+                                |Some(l) ->
+                                    l.changeset.id.ToString()+";"+
+                                    l.changeset.date.ToString()+";"+
+                                    l.value.ToString()+";"+
+                                    l.changeset.author+";"+
+                                    l.totalCovered.ToString()+";"+
+                                    l.totalNotCovered.ToString() 
+                                |None -> "")  
+    |> appendLinesToFile (cachePath+"_cleaned")
 
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
 //    let teamProject = tm.GetTeamProject("Front Office 5.0")

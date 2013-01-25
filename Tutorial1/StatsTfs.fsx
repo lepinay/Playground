@@ -50,6 +50,8 @@ module TFS =
         comment:string;
     }
 
+
+
     let allChangesets = 
         history 
             |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
@@ -61,31 +63,50 @@ module TFS =
         totalCovered:uint32;
         totalNotCovered:uint32;
     }
-    let cachePath = @"D:\temp\Playground\Tutorial1\cache.txt"
+
+    type FailedRun = {
+        id:int
+        date:System.DateTime
+        reason:string
+    }
+
+    type CacheEntry =
+        | Success of coverageResult
+        | NoRecord
+        | Failure of FailedRun
+
+    let cachePath = @"C:\Users\llepinay\Documents\Visual Studio 2012\Projects\Playground\Tutorial1\cache.txt"
     let cache = 
         System.IO.File.ReadLines(cachePath)
         |> Seq.map( fun l -> match l.Split(';') with
                                 |[|id;date;value;author;totalCovered;totalNotCovered|] 
-                                    -> Some({
-                                             coverageResult.changeset = 
-                                                {   
-                                                    id=System.Int32.Parse(id)
-                                                    date=System.DateTime.Parse(date)
-                                                    author=author;
-                                                    comment=""
-                                                };
-                                             value=System.Double.Parse(value);
-                                             totalCovered=System.UInt32.Parse(totalCovered);
-                                             totalNotCovered=System.UInt32.Parse(totalNotCovered)})
-                                | _ -> None )
+                                    -> Success({
+                                                 coverageResult.changeset = 
+                                                    {   
+                                                        id=System.Int32.Parse(id)
+                                                        date=System.DateTime.Parse(date)
+                                                        author=author;
+                                                        comment=""
+                                                    };
+                                                 value=System.Double.Parse(value);
+                                                 totalCovered=System.UInt32.Parse(totalCovered);
+                                                 totalNotCovered=System.UInt32.Parse(totalNotCovered)})
+                                |[|id;date;reason|]
+                                    -> Failure({id=System.Int32.Parse(id);date=System.DateTime.Parse(date);reason=reason})
+                                | _ -> NoRecord )
 
-    let sortedCache = cache |> Seq.sortBy(fun c->c.Value.changeset.date)
-
-
+    let sortedCache = cache 
+                        |> Seq.sortBy(fun c-> match c with 
+                                                | NoRecord -> System.DateTime.MaxValue
+                                                | Success(r) -> r.changeset.date
+                                                | Failure(r) -> r.date)
 
     let coverageForChangeset (changeset:ChangeSetDetail) = 
-        match cache |> Seq.tryFind ( fun c -> c.Value.changeset.id = changeset.id ) with
-            |Some(c) -> c
+        match cache |> Seq.tryFind ( fun c -> match c with 
+                                                 |Success(r) -> r.changeset.id = changeset.id
+                                                 |Failure(r) -> r.id = changeset.id
+                                                 |NoRecord -> false ) with
+            |Some(r) -> r
             |None ->
                     let checkoutFolder = @"c:/temp/yo3/"
                     let sourceFolder = "$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe"
@@ -96,81 +117,91 @@ module TFS =
                         |> Seq.iter( fun i -> printfn "%A" i; i.DownloadFile(checkoutFolder + i.ServerItem ))
                     let msbuild = System.Diagnostics.Process.Start(@"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe", @""""+ checkoutFolder + @"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/OrderPipe.sln""")
                     msbuild.WaitForExit()
-                    let tests = 
-                            let tests = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*tests*.dll", SearchOption.AllDirectories)
-                            let specs = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*specs.inmem.dll", SearchOption.AllDirectories)
-                            Seq.append tests specs  
-                            |> Seq.filter(fun f-> f.Contains("bin"))
-                            |> Seq.map(fun f-> 
-                                              printfn "%A" f
-                                              "/testcontainer:\""+f+"\"" )
-                            |> Seq.fold (fun a b -> a + " " + b) ""
+                    match msbuild.ExitCode with
+                        | 0 -> 
+                            let tests = 
+                                    let tests = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*tests*.dll", SearchOption.AllDirectories)
+                                    let specs = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*specs.inmem.dll", SearchOption.AllDirectories)
+                                    Seq.append tests specs  
+                                    |> Seq.filter(fun f-> f.Contains("bin"))
+                                    |> Seq.map(fun f-> 
+                                                      printfn "%A" f
+                                                      "/testcontainer:\""+f+"\"" )
+                                    |> Seq.fold (fun a b -> a + " " + b) ""
 
-                    match tests with
-                    | "" -> Some({changeset={id=0;date=System.DateTime.Now;author="";comment=""};value=float 0;totalCovered=uint32 0;totalNotCovered= uint32 0})
-                    | _ ->
-                            let p = System.Diagnostics.Process.Start(@"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\mstest.exe", 
-                                                                 @"/runconfig:"""+checkoutFolder+"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/local.testsettings\" " +
-                                                                 @"/resultsfile:"""+checkoutFolder+"testresults4.trx \" "
-                                                                 + tests) 
-                            p.WaitForExit()
-                            let coverageFiles = Directory.EnumerateFiles(checkoutFolder,"*.coverage",SearchOption.AllDirectories)
-                            match Seq.toList coverageFiles with
-                                | [] -> None
-                                | _ ->
-                                        let coverageFile = Seq.head(coverageFiles)
-                                        let ci = CoverageInfo.CreateFromFile(coverageFile);
-                                        let dataSet = ci.BuildDataSet();
-                                        let totalCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksCovered) 
-                                        let totalNotCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksNotCovered) 
-                                        let coveragePct = float totalCovered / float(totalCovered+totalNotCovered)
-                                        System.IO.File.AppendAllLines(cachePath, 
-                                            [
-                                                changeset.id.ToString()+";"+
-                                                changeset.date.ToString()+";"+
-                                                coveragePct.ToString()+";"+
-                                                changeset.author+";"+
-                                                totalCovered.ToString()+";"+
-                                                totalNotCovered.ToString()
-                                            ])
-                                        Some({
-                                                changeset = changeset
-                                                value=coveragePct;
-                                                totalCovered = totalCovered;
-                                                totalNotCovered = totalNotCovered;
-                                        })
+                            match tests with
+                            | "" -> Failure({id=changeset.id;date=changeset.date;reason="No tests"})
+                            | _ ->
+                                    let p = System.Diagnostics.Process.Start(@"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\mstest.exe", 
+                                                                         @"/runconfig:"""+checkoutFolder+"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/local.testsettings\" " +
+                                                                         @"/resultsfile:"""+checkoutFolder+"testresults4.trx \" "
+                                                                         + tests) 
+                                    p.WaitForExit()
+                                    match p.ExitCode with
+                                        | 0 ->
+                                            let coverageFiles = Directory.EnumerateFiles(checkoutFolder,"*.coverage",SearchOption.AllDirectories)
+                                            match Seq.toList coverageFiles with
+                                                | [] -> Failure({id=changeset.id;date=changeset.date;reason="No coverage data"})
+                                                | _ ->
+                                                        let coverageFile = Seq.head(coverageFiles)
+                                                        let ci = CoverageInfo.CreateFromFile(coverageFile);
+                                                        let dataSet = ci.BuildDataSet();
+                                                        let totalCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksCovered) 
+                                                        let totalNotCovered = dataSet.Module |> Seq.sumBy( fun m -> m.BlocksNotCovered) 
+                                                        let coveragePct = float totalCovered / float(totalCovered+totalNotCovered)
+                                                        System.IO.File.AppendAllLines(cachePath, 
+                                                            [
+                                                                changeset.id.ToString()+";"+
+                                                                changeset.date.ToString()+";"+
+                                                                coveragePct.ToString()+";"+
+                                                                changeset.author+";"+
+                                                                totalCovered.ToString()+";"+
+                                                                totalNotCovered.ToString()
+                                                            ])
+                                                        Success({
+                                                                changeset = changeset
+                                                                value=coveragePct;
+                                                                totalCovered = totalCovered;
+                                                                totalNotCovered = totalNotCovered;
+                                                        })
+                                        | _ ->
+                                            System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+"Unit tests failed"])
+                                            Failure({id=changeset.id;date=changeset.date;reason="Unit tests failed"})
+                        | _ -> 
+                                System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+"Build failed"])
+                                Failure({id=changeset.id;date=changeset.date;reason="Build failed"})
 
 
-    let rec averageCoverage (changesets:list<ChangeSetDetail>) (coverageForChangeset: ChangeSetDetail -> coverageResult option) results : list<coverageResult option> = 
+    let rec averageCoverage (changesets:list<ChangeSetDetail>) (coverageForChangeset: ChangeSetDetail -> CacheEntry) results : list<CacheEntry> = 
         match changesets with
             | [] -> results
             | changeset::xs -> 
                 let r = coverageForChangeset changeset :: results
                 averageCoverage xs coverageForChangeset r
                     
-    let cov:list<coverageResult option> = averageCoverage (allChangesets |> Seq.toList) coverageForChangeset []
+    let cov:list<CacheEntry> = averageCoverage (allChangesets |> Seq.toList) coverageForChangeset []
 
     
 
     type progressResult = 
         { 
-            coverage:coverageResult
+            coverage:CacheEntry
             progress:int
         }
 
-    let rec progressReport (resultin:list<coverageResult option>) (prev:coverageResult option) :list<progressResult> = 
+    let rec progressReport (resultin:list<CacheEntry>) (prev:CacheEntry option) :list<progressResult> = 
         match resultin with
             | [] -> []
-            | None::queue -> progressReport queue None
-            | Some head::queue ->
+            | Success head::queue ->
                 let progress = 
                     match prev with
                                 |None -> 0
-                                |Some prev -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
+                                |Some(Success prev) -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
                 {
                     coverage=head
                     progress= progress
                 }::progressReport queue (Some(head))
+
 
      //cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )   
 //     let cov = 
@@ -189,30 +220,7 @@ module TFS =
         r
         |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A %A" c.coverage.changeset.date c.coverage.totalCovered c.coverage.totalNotCovered c.progress c.coverage.changeset.author c.coverage.changeset.id )       
 
-
-    let cleanCache cache =
-        let report = makereportFromCache cache
-        printReport report
-        let dodgyIds = 
-            report
-            |> List.filter(fun c-> System.Math.Abs(c.progress) >= 100 )
-        match dodgyIds with
-            | [] -> cache
-            | _ -> cache |> Seq.filter( fun c-> not( dodgyIds |> Seq.exists (fun d -> d.coverage.changeset.id = c.Value.changeset.id) ) )
-    
-    let appendLinesToFile file lines = System.IO.File.AppendAllLines(file, lines)
-
-    sortedCache 
-    |> Seq.map(fun c-> match c with
-                                |Some(l) ->
-                                    l.changeset.id.ToString()+";"+
-                                    l.changeset.date.ToString()+";"+
-                                    l.value.ToString()+";"+
-                                    l.changeset.author+";"+
-                                    l.totalCovered.ToString()+";"+
-                                    l.totalNotCovered.ToString() 
-                                |None -> "")  
-    |> appendLinesToFile (cachePath+"_cleaned")
+        sortedCache |> makereportFromCache |> printReport
 
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
 //    let teamProject = tm.GetTeamProject("Front Office 5.0")

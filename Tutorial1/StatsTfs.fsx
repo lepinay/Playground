@@ -185,22 +185,23 @@ module TFS =
 
     type progressResult = 
         { 
-            coverage:CacheEntry
+            coverage:coverageResult
             progress:int
         }
 
-    let rec progressReport (resultin:list<CacheEntry>) (prev:CacheEntry option) :list<progressResult> = 
+    let rec progressReport (resultin:list<CacheEntry>) (prev:coverageResult option) :list<progressResult> = 
         match resultin with
             | [] -> []
             | Success head::queue ->
                 let progress = 
                     match prev with
-                                |None -> 0
-                                |Some(Success prev) -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
+                                |Some(prev) -> (int head.totalCovered - int prev.totalCovered ) - (int head.totalNotCovered - int prev.totalNotCovered)
+                                | _ -> 0
                 {
                     coverage=head
                     progress= progress
                 }::progressReport queue (Some(head))
+            | _::queue -> progressReport queue prev
 
 
      //cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )   
@@ -216,11 +217,12 @@ module TFS =
     let makereportFromCache c = 
         (progressReport (Seq.toList c) None )
 
+
     let printReport r = 
         r
         |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A %A" c.coverage.changeset.date c.coverage.totalCovered c.coverage.totalNotCovered c.progress c.coverage.changeset.author c.coverage.changeset.id )       
 
-        sortedCache |> makereportFromCache |> printReport
+    sortedCache |> makereportFromCache |> printReport
 
 //    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
 //    let teamProject = tm.GetTeamProject("Front Office 5.0")

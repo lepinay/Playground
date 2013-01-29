@@ -43,6 +43,31 @@ module TFS =
 //        printfn "%A" c
 // float(m.Statistics.BlocksCovered) / float(m.Statistics.BlocksCovered+m.Statistics.BlocksNotCovered)
     
+    let startProcess p pars = System.Diagnostics.Process.Start(p, pars)
+    let enumerateAllFiles dir pattern = Directory.EnumerateFiles(dir, pattern, SearchOption.AllDirectories)
+
+    type ProcessBuilder() = 
+        member x.Bind(comp:System.Diagnostics.Process, func) = 
+            comp.WaitForExit()
+            func()
+        member x.Zero =
+            ()
+            
+    let processflow = new ProcessBuilder()
+
+    processflow {
+        do startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
+        do startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
+        do startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
+    }
+
+    let p1 = startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
+    p1.WaitForExit()
+    let p2 = startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
+    p2.WaitForExit()
+    let p3 = startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
+    p3.WaitForExit()
+
     type ChangeSetDetail = {
         id:int;
         author:string;
@@ -75,7 +100,7 @@ module TFS =
         | NoRecord
         | Failure of FailedRun
 
-    let cachePath = @"C:\Users\llepinay\Documents\Visual Studio 2012\Projects\Playground\Tutorial1\cache.txt"
+    let cachePath = @"D:\temp\Playground\Tutorial1\cache.txt"
     let cache = 
         System.IO.File.ReadLines(cachePath)
         |> Seq.map( fun l -> match l.Split(';') with
@@ -115,13 +140,13 @@ module TFS =
                     vc.GetItems(sourceFolder, new ChangesetVersionSpec(changeset.id) ,RecursionType.Full).Items 
                         |> Seq.filter( fun i -> i.ItemType = ItemType.File) 
                         |> Seq.iter( fun i -> printfn "%A" i; i.DownloadFile(checkoutFolder + i.ServerItem ))
-                    let msbuild = System.Diagnostics.Process.Start(@"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe", @""""+ checkoutFolder + @"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/OrderPipe.sln""")
+                    let msbuild = startProcess @"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe" (@""""+ checkoutFolder + @"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/OrderPipe.sln""")
                     msbuild.WaitForExit()
                     match msbuild.ExitCode with
                         | 0 -> 
                             let tests = 
-                                    let tests = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*tests*.dll", SearchOption.AllDirectories)
-                                    let specs = Directory.EnumerateFiles(checkoutFolder+sourceFolder, "*specs.inmem.dll", SearchOption.AllDirectories)
+                                    let tests = enumerateAllFiles (checkoutFolder+sourceFolder) "*tests*.dll"
+                                    let specs = enumerateAllFiles (checkoutFolder+sourceFolder) "*specs.inmem.dll"
                                     Seq.append tests specs  
                                     |> Seq.filter(fun f-> f.Contains("bin"))
                                     |> Seq.map(fun f-> 
@@ -132,14 +157,13 @@ module TFS =
                             match tests with
                             | "" -> Failure({id=changeset.id;date=changeset.date;reason="No tests"})
                             | _ ->
-                                    let p = System.Diagnostics.Process.Start(@"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\mstest.exe", 
-                                                                         @"/runconfig:"""+checkoutFolder+"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/local.testsettings\" " +
-                                                                         @"/resultsfile:"""+checkoutFolder+"testresults4.trx \" "
-                                                                         + tests) 
+                                    let p = startProcess (@"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\mstest.exe") 
+                                                         (@"/runconfig:"""+checkoutFolder+"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/local.testsettings\" " +
+                                                          @"/resultsfile:"""+checkoutFolder+"testresults4.trx \" " + tests) 
                                     p.WaitForExit()
                                     match p.ExitCode with
                                         | 0 ->
-                                            let coverageFiles = Directory.EnumerateFiles(checkoutFolder,"*.coverage",SearchOption.AllDirectories)
+                                            let coverageFiles = enumerateAllFiles checkoutFolder "*.coverage"
                                             match Seq.toList coverageFiles with
                                                 | [] -> Failure({id=changeset.id;date=changeset.date;reason="No coverage data"})
                                                 | _ ->
@@ -215,7 +239,7 @@ module TFS =
 //                ]
 
     let makereportFromCache c = 
-        (progressReport (Seq.toList c) None )
+        (progressReport (Seq.toList c) None  )
 
 
     let printReport r = 

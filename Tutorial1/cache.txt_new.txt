@@ -1,4 +1,4 @@
-﻿19908;13/03/2012 11:30:55;Build failed
+19908;13/03/2012 11:30:55;Build failed
 19908;13/03/2012 11:30:55;Build failed
 20042;16/03/2012 16:55:17;Build failed
 20042;16/03/2012 16:55:17;Build failed
@@ -38,6 +38,7 @@
 20769;04/04/2012 11:29:55;0,149499284692418;OREDIS-VP\rhassen;209;1189
 20778;04/04/2012 12:38:41;0,159420289855072;OREDIS-VP\ahocquet;220;1160
 20786;04/04/2012 14:27:48;0,159420289855072;OREDIS-VP\llepinay;220;1160
+20928;10/04/2012 10:56:52;Build failed
 20928;10/04/2012 10:56:52;Build failed
 21052;12/04/2012 11:14:10;Build failed
 21052;12/04/2012 11:14:10;Build failed
@@ -845,78 +846,3 @@
 35845;28/01/2013 18:41:04;Unit tests failed
 35845;28/01/2013 18:41:04;Unit tests failed
 35845;28/01/2013 18:41:04;Unit tests failed
-21975;04/05/2012 17:43:28;No coverage data
-21962;04/05/2012 16:20:46;No coverage data
-21954;04/05/2012 14:41:28;No coverage data
-21953;04/05/2012 13:47:06;No coverage data
-21951;04/05/2012 13:36:41;No coverage data
-21918;03/05/2012 17:39:03;No coverage data
-21903;03/05/2012 16:24:51;No coverage data
-21899;03/05/2012 15:52:07;No coverage data
-21855;02/05/2012 17:24:30;No coverage data
-21854;02/05/2012 17:19:19;No coverage data
-21853;02/05/2012 17:08:26;No coverage data
-21851;02/05/2012 16:41:25;No coverage data
-21841;02/05/2012 15:31:19;No coverage data
-21827;02/05/2012 12:22:42;No coverage data
-21826;02/05/2012 11:58:02;No coverage data
-21773;27/04/2012 18:06:29;No coverage data
-21757;27/04/2012 15:09:54;No coverage data
-21755;27/04/2012 14:48:45;No coverage data
-21726;26/04/2012 18:19:12;No coverage data
-21716;26/04/2012 16:59:38;No coverage data
-21714;26/04/2012 16:50:52;No coverage data
-21707;26/04/2012 15:34:21;No coverage data
-21705;26/04/2012 14:55:18;No coverage data
-21679;26/04/2012 09:29:50;No coverage data
-21661;25/04/2012 15:01:47;No coverage data
-21655;25/04/2012 14:34:03;No coverage data
-21647;25/04/2012 11:42:14;No coverage data
-21606;24/04/2012 15:34:09;No coverage data
-21601;24/04/2012 15:06:45;No coverage data
-21544;23/04/2012 16:16:12;No coverage data
-21508;20/04/2012 18:08:18;No coverage data
-21506;20/04/2012 18:01:04;No coverage data
-21467;20/04/2012 14:58:05;No coverage data
-21465;20/04/2012 14:34:23;No coverage data
-21459;20/04/2012 13:05:25;No coverage data
-21458;20/04/2012 13:03:38;No coverage data
-21457;20/04/2012 13:02:16;No coverage data
-21456;20/04/2012 12:56:44;No coverage data
-21455;20/04/2012 12:50:36;No coverage data
-21454;20/04/2012 12:47:41;No coverage data
-21453;20/04/2012 12:44:54;No coverage data
-21444;20/04/2012 12:02:07;No coverage data
-21423;20/04/2012 10:57:21;No coverage data
-21422;20/04/2012 10:56:54;No coverage data
-21421;20/04/2012 10:56:30;No coverage data
-21414;19/04/2012 18:28:15;No coverage data
-21413;19/04/2012 17:52:52;No coverage data
-21404;19/04/2012 16:33:31;No coverage data
-21361;19/04/2012 09:55:04;No coverage data
-21357;18/04/2012 19:31:22;No coverage data
-21356;18/04/2012 19:00:38;No coverage data
-21345;18/04/2012 16:52:48;No coverage data
-21343;18/04/2012 16:38:47;No coverage data
-21339;18/04/2012 16:13:41;No coverage data
-21322;18/04/2012 14:39:30;No coverage data
-21304;18/04/2012 11:48:51;No coverage data
-21300;18/04/2012 11:24:40;No coverage data
-21284;18/04/2012 09:41:20;No coverage data
-21280;17/04/2012 19:16:58;No coverage data
-21269;17/04/2012 17:08:10;No coverage data
-21247;17/04/2012 12:23:47;No coverage data
-21238;17/04/2012 11:29:25;No coverage data
-21222;16/04/2012 17:33:14;No coverage data
-21206;16/04/2012 15:47:21;No coverage data
-21199;16/04/2012 15:08:07;No coverage data
-21198;16/04/2012 15:06:52;No coverage data
-21190;16/04/2012 14:48:06;No coverage data
-21182;16/04/2012 13:03:29;No coverage data
-21180;16/04/2012 12:37:56;No coverage data
-21178;16/04/2012 12:24:29;No coverage data
-21171;16/04/2012 11:45:22;No coverage data
-21170;16/04/2012 11:38:58;No coverage data
-21169;16/04/2012 11:29:30;No coverage data
-21165;16/04/2012 11:02:25;No coverage data
-21160;16/04/2012 10:01:24;No coverage data

@@ -43,30 +43,9 @@ module TFS =
 //        printfn "%A" c
 // float(m.Statistics.BlocksCovered) / float(m.Statistics.BlocksCovered+m.Statistics.BlocksNotCovered)
     
-    let startProcess p pars = System.Diagnostics.Process.Start(p, pars)
+    let startProcess p pars = 
+        System.Diagnostics.Process.Start(p, pars)
     let enumerateAllFiles dir pattern = Directory.EnumerateFiles(dir, pattern, SearchOption.AllDirectories)
-
-    type ProcessBuilder() = 
-        member x.Bind(comp:System.Diagnostics.Process, func) = 
-            comp.WaitForExit()
-            func()
-        member x.Zero =
-            ()
-            
-    let processflow = new ProcessBuilder()
-
-    processflow {
-        do startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
-        do startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
-        do startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
-    }
-
-    let p1 = startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
-    p1.WaitForExit()
-    let p2 = startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
-    p2.WaitForExit()
-    let p3 = startProcess @"c:\windows\system32\ping.exe" @"www.google.com"
-    p3.WaitForExit()
 
     type ChangeSetDetail = {
         id:int;
@@ -75,12 +54,13 @@ module TFS =
         comment:string;
     }
 
-
-
     let allChangesets = 
         history 
             |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
             |> Seq.map(fun h-> {id=h.ChangesetId;author=h.Committer;date=h.CreationDate;comment=h.Comment}) 
+            |> Seq.toList
+
+    allChangesets |> Seq.iter(fun c-> printfn "%A" c.id)
 
     type coverageResult = {
         changeset:ChangeSetDetail
@@ -100,7 +80,14 @@ module TFS =
         | NoRecord
         | Failure of FailedRun
 
-    let cachePath = @"D:\temp\Playground\Tutorial1\cache.txt"
+    let cachePath = @"C:\Users\llepinay\documents\visual studio 2012\Projects\Playground\Tutorial1\cache.txt"
+
+    let appendAllLines path lines = System.IO.File.AppendAllLines(path, lines)
+
+    allChangesets 
+    |> Seq.map( fun c-> c.id.ToString()+";"+c.author+";"+c.date.ToString()+";"+c.comment )
+    |> appendAllLines (cachePath + "_changesets")
+
     let cache = 
         System.IO.File.ReadLines(cachePath)
         |> Seq.map( fun l -> match l.Split(';') with
@@ -119,6 +106,29 @@ module TFS =
                                 |[|id;date;reason|]
                                     -> Failure({id=System.Int32.Parse(id);date=System.DateTime.Parse(date);reason=reason})
                                 | _ -> NoRecord )
+
+//    let correctedCache = 
+//        cache 
+//        |> Seq.map( fun c-> 
+//            match c with 
+//                |Failure r-> 
+//                    let correctedDate = allChangesets |> Seq.find( fun c -> c.id = r.id)
+//                    Failure({id=r.id;date=correctedDate.date;reason=r.reason})
+//                |r->r)
+//
+//    correctedCache
+//        |> Seq.filter(fun c -> match c with |Failure r->true|_->false)
+//
+//    correctedCache
+//        |> Seq.sortBy(fun c-> match c with 
+//                                | NoRecord -> System.DateTime.MaxValue
+//                                | Success(r) -> r.changeset.date
+//                                | Failure(r) -> r.date) 
+//        |> Seq.map(fun c-> match c with
+//                            | Failure r -> r.id.ToString() + ";" + r.date.ToString() + ";" + r.reason
+//                            | Success r -> r.changeset.id.ToString() + ";" + r.changeset.date.ToString() + ";" + r.value.ToString() + ";" + r.changeset.author + ";" + r.totalCovered.ToString() + ";" + r.totalNotCovered.ToString()
+//                            | NoRecord -> "" )
+//        |> appendAllLines (cachePath + "_new.txt")
 
     let sortedCache = cache 
                         |> Seq.sortBy(fun c-> match c with 
@@ -165,7 +175,9 @@ module TFS =
                                         | 0 ->
                                             let coverageFiles = enumerateAllFiles checkoutFolder "*.coverage"
                                             match Seq.toList coverageFiles with
-                                                | [] -> Failure({id=changeset.id;date=changeset.date;reason="No coverage data"})
+                                                | [] -> 
+                                                    System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+changeset.date.ToString()+";No coverage data"])
+                                                    Failure({id=changeset.id;date=changeset.date;reason="No coverage data"})
                                                 | _ ->
                                                         let coverageFile = Seq.head(coverageFiles)
                                                         let ci = CoverageInfo.CreateFromFile(coverageFile);
@@ -189,10 +201,10 @@ module TFS =
                                                                 totalNotCovered = totalNotCovered;
                                                         })
                                         | _ ->
-                                            System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+"Unit tests failed"])
+                                            System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+changeset.date.ToString()+";Unit tests failed"])
                                             Failure({id=changeset.id;date=changeset.date;reason="Unit tests failed"})
                         | _ -> 
-                                System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+"Build failed"])
+                                System.IO.File.AppendAllLines(cachePath,[changeset.id.ToString()+";"+changeset.date.ToString()+";Build failed"])
                                 Failure({id=changeset.id;date=changeset.date;reason="Build failed"})
 
 
@@ -205,6 +217,9 @@ module TFS =
                     
     let cov:list<CacheEntry> = averageCoverage (allChangesets |> Seq.toList) coverageForChangeset []
 
+    allChangesets |> Seq.iter(fun c -> printfn "%A" c.date )
+
+    coverageForChangeset {ChangeSetDetail.author="test";ChangeSetDetail.comment="";ChangeSetDetail.date=System.DateTime.Now;ChangeSetDetail.id=20928;}
     
 
     type progressResult = 
@@ -227,24 +242,32 @@ module TFS =
                 }::progressReport queue (Some(head))
             | _::queue -> progressReport queue prev
 
-
-     //cov |> Seq.iter(fun c-> printfn "\"%A\" %A %A" c.date c.value c.author )   
-//     let cov = 
-//                [
-//                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 10;totalNotCovered=uint32 10;author="a"}
-//                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 15;totalNotCovered=uint32 12;author="b"}
-//                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 16;totalNotCovered=uint32 12;author="c"}
-//                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 16;totalNotCovered=uint32 12;author="c"}
-//                    {coverageResult.date=System.DateTime.Now;value=float 0;totalCovered=uint32 20;totalNotCovered=uint32 12;author="c"}
-//                ]
-
     let makereportFromCache c = 
         (progressReport (Seq.toList c) None  )
 
+    type progressResultWithCumul = 
+        {
+            progress:progressResult
+            cumul:int
+        }
+
+    let rec cumul (progress:list<progressResult>) cumu = 
+        match progress with
+            | head::queue -> 
+                let newCumul = cumu+head.progress
+                {progress=head;cumul=newCumul}:: cumul progress newCumul
+            | [] -> []
+        
 
     let printReport r = 
         r
-        |> Seq.iter(fun c-> printfn "\"%A\" %A %A %A %A %A" c.coverage.changeset.date c.coverage.totalCovered c.coverage.totalNotCovered c.progress c.coverage.changeset.author c.coverage.changeset.id )       
+        |> Seq.groupBy( fun c -> c.coverage.changeset.author )
+        |> Seq.iter(fun(k,v)-> 
+            v 
+            |> Seq.toList 
+            |> cumul 
+            |> List.iter( fun c -> printfn "\"%A\" %A %A %A %A %A" c.coverage.changeset.date c.coverage.totalCovered c.coverage.totalNotCovered c.progress c.coverage.changeset.author c.coverage.changeset.id )
+            )       
 
     sortedCache |> makereportFromCache |> printReport
 

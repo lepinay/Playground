@@ -16,6 +16,42 @@ module TFS =
     open Microsoft.VisualStudio.Coverage.Analysis
     open System.IO
 
+    type TfsContext = 
+        {
+            ProjectCollection:TfsTeamProjectCollection
+            VersionControlServer:VersionControlServer
+            BuildServer:IBuildServer
+            TestManagement:ITestManagementService
+            TeamProject:TeamProject
+            History:seq<Changeset>
+        }
+
+    let createContext srcFolder = 
+        let tfsUrl = new System.Uri("http://vptfs/tfs/sivp")
+        let collection = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(tfsUrl)
+        let vc = collection.GetService<VersionControlServer>()
+        {
+            ProjectCollection=collection
+            VersionControlServer=vc
+            BuildServer=collection.GetService<IBuildServer>()
+            TestManagement=collection.GetService<ITestManagementService>()
+            TeamProject=vc.TryGetTeamProject("Front Office 5.0")
+            History = vc.QueryHistory(srcFolder,RecursionType.Full) |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
+        }
+
+    let qualifContext = createContext "$/Front Office 5.0/1.Front/OrderPipe/Qualif"
+
+    // Non livré encore
+    qualifContext.History
+        |> Seq.filter( fun h -> h.CreationDate >= System.DateTime.Parse("30/01/2013 11:57:00") )
+        |> Seq.map( fun h-> h.AssociatedWorkItems )
+
+    // Livré toujours en resolved
+    qualifContext.History
+        |> Seq.filter( fun h -> h.CreationDate <= System.DateTime.Parse("31/01/2013 10:12:00") && h.WorkItems |> Seq.exists(fun w->w.State = "Resolved" ) )
+        |> Seq.map( fun h-> h.AssociatedWorkItems |> Seq.filter(fun w->w.State = "Resolved" ))
+        
+
     let tfsUrl = new System.Uri("http://vptfs/tfs/sivp")
     let collection = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(tfsUrl)
     let vc = collection.GetService<VersionControlServer>()
@@ -251,11 +287,13 @@ module TFS =
             cumul:int
         }
 
-    let rec cumul (progress:list<progressResult>) cumu = 
+    let rec cumul cumu (progress:list<progressResult>) :list<progressResultWithCumul> = 
         match progress with
-            | head::queue -> 
+            | head::queue when System.Math.Abs(head.progress) < 100 -> 
                 let newCumul = cumu+head.progress
-                {progress=head;cumul=newCumul}:: cumul progress newCumul
+                {progress=head;cumul=newCumul}:: cumul newCumul queue 
+            | head::queue -> 
+                cumul cumu queue 
             | [] -> []
         
 
@@ -265,9 +303,15 @@ module TFS =
         |> Seq.iter(fun(k,v)-> 
             v 
             |> Seq.toList 
-            |> cumul 
-            |> List.iter( fun c -> printfn "\"%A\" %A %A %A %A %A" c.coverage.changeset.date c.coverage.totalCovered c.coverage.totalNotCovered c.progress c.coverage.changeset.author c.coverage.changeset.id )
-            )       
+            |> cumul 0
+            |> List.iter( fun c -> printfn "\"%A\" %A %A %A %A %A %A" 
+                                    c.progress.coverage.changeset.date 
+                                    c.progress.coverage.totalCovered 
+                                    c.progress.coverage.totalNotCovered 
+                                    c.progress.progress
+                                    c.progress.coverage.changeset.author 
+                                    c.progress.coverage.changeset.id 
+                                    c.cumul ))       
 
     sortedCache |> makereportFromCache |> printReport
 

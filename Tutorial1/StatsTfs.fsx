@@ -1,14 +1,4 @@
-﻿
-#r  "Microsoft.TeamFoundation.Client"
-#r  "System.Xml"
-#r  "Microsoft.TeamFoundation.Build.Client"
-#r  "Microsoft.TeamFoundation.VersionControl.Client"
-#r  "Microsoft.TeamFoundation.TestManagement.Client"
-#r  "Microsoft.TeamFoundation.WorkItemTracking.Client"
-#r  @"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\PrivateAssemblies\Microsoft.VisualStudio.Coverage.Analysis.dll"
-#r  "System.Data"
-#r  "System.Data.DatasetExtensions"
-
+﻿#load "references.fsx"
 #load "TFS.fs"
 
 open Microsoft.TeamFoundation.Client 
@@ -237,26 +227,4 @@ module StatCouverture =
 
     ()
 
-module SuivitLivraisons =
-    open TFS.TFS
-    
-    let qualifContext = createContext "$/Front Office 5.0/1.Front/OrderPipe/Qualif"
 
-    // Non livré encore
-    qualifContext.History
-        |> Seq.filter( fun h -> h.CreationDate >= System.DateTime.Parse("30/01/2013 11:57:00") )
-        |> Seq.map( fun h-> h.AssociatedWorkItems )
-
-    // Livré toujours en resolved
-    let latestLivraison = 
-        qualifContext.BuildServer.QueryBuilds("Front Office 5.0", "OrderPipe_R7")
-        |> Seq.find(fun b-> b.BuildNumber = "OrderPipe_R7_v1.0.0.290.01")
-
-    qualifContext.History
-        |> Seq.filter( fun h -> 
-            h.ChangesetId <= System.Convert.ToInt32(latestLivraison.SourceGetVersion.Replace("C","")) && 
-            h.WorkItems |> Seq.exists(fun w->w.State = "Resolved" ) )
-        |> Seq.map( fun h-> h.AssociatedWorkItems |> Seq.filter(fun w->w.State = "Resolved" ))
-        |> Seq.concat
-        |> Seq.distinctBy( fun h-> h.Id)
-        |> Seq.iter( fun h-> printfn "%A %A" h.Id h.Title )

@@ -1,5 +1,4 @@
 ﻿
-
 #r  "Microsoft.TeamFoundation.Client"
 #r  "System.Xml"
 #r  "Microsoft.TeamFoundation.Build.Client"
@@ -7,81 +6,25 @@
 #r  "Microsoft.TeamFoundation.TestManagement.Client"
 #r  "Microsoft.TeamFoundation.WorkItemTracking.Client"
 #r  @"C:\Program Files (x86)\Microsoft Visual Studio 11.0\Common7\IDE\PrivateAssemblies\Microsoft.VisualStudio.Coverage.Analysis.dll"
+#r  "System.Data"
 #r  "System.Data.DatasetExtensions"
-module TFS = 
-    open Microsoft.TeamFoundation.Client 
-    open Microsoft.TeamFoundation.VersionControl.Client 
-    open Microsoft.TeamFoundation.Build.Client  
-    open Microsoft.TeamFoundation.TestManagement.Client  
-    open Microsoft.VisualStudio.Coverage.Analysis
-    open System.IO
 
-    type TfsContext = 
-        {
-            ProjectCollection:TfsTeamProjectCollection
-            VersionControlServer:VersionControlServer
-            BuildServer:IBuildServer
-            TestManagement:ITestManagementService
-            TeamProject:TeamProject
-            History:seq<Changeset>
-        }
+#load "TFS.fs"
 
-    let createContext srcFolder = 
-        let tfsUrl = new System.Uri("http://vptfs/tfs/sivp")
-        let collection = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(tfsUrl)
-        let vc = collection.GetService<VersionControlServer>()
-        {
-            ProjectCollection=collection
-            VersionControlServer=vc
-            BuildServer=collection.GetService<IBuildServer>()
-            TestManagement=collection.GetService<ITestManagementService>()
-            TeamProject=vc.TryGetTeamProject("Front Office 5.0")
-            History = vc.QueryHistory(srcFolder,RecursionType.Full) |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
-        }
+open Microsoft.TeamFoundation.Client 
+open Microsoft.TeamFoundation.VersionControl.Client 
+open Microsoft.TeamFoundation.Build.Client  
+open Microsoft.TeamFoundation.TestManagement.Client  
+open Microsoft.VisualStudio.Coverage.Analysis
+open System.IO
 
-    let qualifContext = createContext "$/Front Office 5.0/1.Front/OrderPipe/Qualif"
+module StatCouverture = 
+    open TFS.TFS
 
-    // Non livré encore
-    qualifContext.History
-        |> Seq.filter( fun h -> h.CreationDate >= System.DateTime.Parse("30/01/2013 11:57:00") )
-        |> Seq.map( fun h-> h.AssociatedWorkItems )
-
-    // Livré toujours en resolved
-    qualifContext.History
-        |> Seq.filter( fun h -> h.CreationDate <= System.DateTime.Parse("31/01/2013 10:12:00") && h.WorkItems |> Seq.exists(fun w->w.State = "Resolved" ) )
-        |> Seq.map( fun h-> h.AssociatedWorkItems |> Seq.filter(fun w->w.State = "Resolved" ))
-        
-
-    let tfsUrl = new System.Uri("http://vptfs/tfs/sivp")
-    let collection = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(tfsUrl)
-    let vc = collection.GetService<VersionControlServer>()
-    let bs = collection.GetService<IBuildServer>()
-    let tm = collection.GetService<ITestManagementService>()
-    let project = vc.TryGetTeamProject("Front Office 5.0")
-    let srcFolder = "$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe"
-    let history = vc.QueryHistory(srcFolder,RecursionType.Full)
-
-//    let refactos = history 
-//                            |> Seq.filter( fun h -> h.Comment.ToLower().Contains("refacto"))
-//                            |> Seq.groupBy( fun h -> h.CommitterDisplayName )
-//                            |> Seq.map( fun (u,c) -> (u, Seq.length c))
-//                            |> Seq.sortBy( fun( u,c) -> c)
-//    printfn "refactos"
-//    for c in refactos do
-//        printfn "%A" c
-//
-//    let modifs = history 
-//                            |> Seq.groupBy( fun h -> h.CommitterDisplayName )
-//                            |> Seq.map( fun (u,c) -> (u, Seq.length c))
-//                            |> Seq.sortBy( fun( u,c) -> c)
-//    printfn "modifs"
-//    for c in modifs do
-//        printfn "%A" c
-// float(m.Statistics.BlocksCovered) / float(m.Statistics.BlocksCovered+m.Statistics.BlocksNotCovered)
-    
-    let startProcess p pars = 
-        System.Diagnostics.Process.Start(p, pars)
+    let startProcess p pars = System.Diagnostics.Process.Start(p, pars)
     let enumerateAllFiles dir pattern = Directory.EnumerateFiles(dir, pattern, SearchOption.AllDirectories)
+
+    let devContext = createContext "$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe"
 
     type ChangeSetDetail = {
         id:int;
@@ -91,7 +34,7 @@ module TFS =
     }
 
     let allChangesets = 
-        history 
+        devContext.History
             |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
             |> Seq.map(fun h-> {id=h.ChangesetId;author=h.Committer;date=h.CreationDate;comment=h.Comment}) 
             |> Seq.toList
@@ -143,29 +86,6 @@ module TFS =
                                     -> Failure({id=System.Int32.Parse(id);date=System.DateTime.Parse(date);reason=reason})
                                 | _ -> NoRecord )
 
-//    let correctedCache = 
-//        cache 
-//        |> Seq.map( fun c-> 
-//            match c with 
-//                |Failure r-> 
-//                    let correctedDate = allChangesets |> Seq.find( fun c -> c.id = r.id)
-//                    Failure({id=r.id;date=correctedDate.date;reason=r.reason})
-//                |r->r)
-//
-//    correctedCache
-//        |> Seq.filter(fun c -> match c with |Failure r->true|_->false)
-//
-//    correctedCache
-//        |> Seq.sortBy(fun c-> match c with 
-//                                | NoRecord -> System.DateTime.MaxValue
-//                                | Success(r) -> r.changeset.date
-//                                | Failure(r) -> r.date) 
-//        |> Seq.map(fun c-> match c with
-//                            | Failure r -> r.id.ToString() + ";" + r.date.ToString() + ";" + r.reason
-//                            | Success r -> r.changeset.id.ToString() + ";" + r.changeset.date.ToString() + ";" + r.value.ToString() + ";" + r.changeset.author + ";" + r.totalCovered.ToString() + ";" + r.totalNotCovered.ToString()
-//                            | NoRecord -> "" )
-//        |> appendAllLines (cachePath + "_new.txt")
-
     let sortedCache = cache 
                         |> Seq.sortBy(fun c-> match c with 
                                                 | NoRecord -> System.DateTime.MaxValue
@@ -183,7 +103,7 @@ module TFS =
                     let sourceFolder = "$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe"
                     if Directory.Exists(checkoutFolder) then Directory.Delete(checkoutFolder, true)
                     Directory.CreateDirectory(checkoutFolder) |> ignore
-                    vc.GetItems(sourceFolder, new ChangesetVersionSpec(changeset.id) ,RecursionType.Full).Items 
+                    devContext.VersionControlServer.GetItems(sourceFolder, new ChangesetVersionSpec(changeset.id) ,RecursionType.Full).Items 
                         |> Seq.filter( fun i -> i.ItemType = ItemType.File) 
                         |> Seq.iter( fun i -> printfn "%A" i; i.DownloadFile(checkoutFolder + i.ServerItem ))
                     let msbuild = startProcess @"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe" (@""""+ checkoutFolder + @"$/Front Office 5.0/1.Front/OrderPipe/Dev/src/OrderPipe/OrderPipe.sln""")
@@ -315,50 +235,28 @@ module TFS =
 
     sortedCache |> makereportFromCache |> printReport
 
-//    let builds = bs.QueryBuilds("Front Office 5.0", "OrderPipe_DEV_FT")
-//    let teamProject = tm.GetTeamProject("Front Office 5.0")
-//    let am = teamProject.CoverageAnalysisManager
-
-//    let coverageReport =  
-//            seq { for build in builds do
-//                    for coverage in am.QueryBuildCoverage(build.Uri.ToString(), CoverageQueryFlags.Modules) do
-//                            yield (build.BuildDefinition.Name + " " + coverage.Configuration.BuildFlavor + " " + coverage.Configuration.BuildPlatform, 
-//                                   build.FinishTime.ToString(), 
-//                                   coverage.Modules 
-//                                    |> Seq.map( fun m -> float(m.Statistics.BlocksCovered) / float(m.Statistics.BlocksCovered+m.Statistics.BlocksNotCovered) )
-//                                    |> Seq.average )  }
-//            |> Seq.groupBy( fun (conf, time, stat) -> conf )
-//
-//    for (key,value) in coverageReport do
-//        printfn "%A" key
-//        for (conf, time, stat) in value do
-//            printfn "%A %A %%" time (int(stat)*int(100))
-
     ()
 
-#r "System.Data.dll"
-#r "FSharp.Data.TypeProviders.dll"
-#r "System.Data.Linq.dll"
+module SuivitLivraisons =
+    open TFS.TFS
+    
+    let qualifContext = createContext "$/Front Office 5.0/1.Front/OrderPipe/Qualif"
 
-open System
-open System.Data
-open System.Data.Linq
-open Microsoft.FSharp.Data.TypeProviders
-open Microsoft.FSharp.Linq
+    // Non livré encore
+    qualifContext.History
+        |> Seq.filter( fun h -> h.CreationDate >= System.DateTime.Parse("30/01/2013 11:57:00") )
+        |> Seq.map( fun h-> h.AssociatedWorkItems )
 
-type dbSchema = SqlDataConnection<"">
-let db = dbSchema.GetDataContext()    
-query {
-    for row in db.VP_T_Carts do
-    where (row.MemberId = 259)
-    sortBy row.CreationDate
-    select row
-} |> Seq.last
+    // Livré toujours en resolved
+    let latestLivraison = 
+        qualifContext.BuildServer.QueryBuilds("Front Office 5.0", "OrderPipe_R7")
+        |> Seq.find(fun b-> b.BuildNumber = "OrderPipe_R7_v1.0.0.290.01")
 
-
-#if COMPILED
-module BoilerPlateForForm = 
-    [<System.STAThread>]
-    do ()
-    do System.Windows.Forms.Application.Run()
-#endif
+    qualifContext.History
+        |> Seq.filter( fun h -> 
+            h.ChangesetId <= System.Convert.ToInt32(latestLivraison.SourceGetVersion.Replace("C","")) && 
+            h.WorkItems |> Seq.exists(fun w->w.State = "Resolved" ) )
+        |> Seq.map( fun h-> h.AssociatedWorkItems |> Seq.filter(fun w->w.State = "Resolved" ))
+        |> Seq.concat
+        |> Seq.distinctBy( fun h-> h.Id)
+        |> Seq.iter( fun h-> printfn "%A %A" h.Id h.Title )

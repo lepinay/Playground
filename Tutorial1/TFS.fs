@@ -28,5 +28,7 @@ module TFS =
             BuildServer=collection.GetService<IBuildServer>()
             TestManagement=collection.GetService<ITestManagementService>()
             TeamProject=vc.TryGetTeamProject("Front Office 5.0")
-            History = vc.QueryHistory(srcFolder,RecursionType.Full) |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
+            History = vc.QueryHistory(srcFolder,RecursionType.Full) 
+                        |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
+                        |> Seq.toList
         }

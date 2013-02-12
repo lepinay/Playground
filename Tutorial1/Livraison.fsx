@@ -1,4 +1,5 @@
-﻿#load "references.fsx"
+﻿#time "on"
+#load "references.fsx"
 #load "TFS.fs"
 
 open Microsoft.TeamFoundation.Client 
@@ -13,40 +14,39 @@ module SuivitLivraisons =
     
     let qualifContext = createContext "$/Front Office 5.0/1.Front/OrderPipe/Qualif"
 
-    let c = qualifContext.History
-            |> Seq.find(fun c -> c.ChangesetId = 36151)
-    
     let mergeHistory = 
         qualifContext.VersionControlServer.QueryMerges(null, null, "$/Front Office 5.0/1.Front/OrderPipe/Qualif", LatestVersionSpec.Latest, null, null, RecursionType.Full )
         |> Seq.groupBy(fun m -> m.TargetVersion )
-
-    mergeHistory
-        |> Seq.iter(fun (target, source) -> 
-                printfn "%A" target
-                source |> Seq.iter(fun c-> printfn "    %A" c.SourceVersion)
-                )
-    //    |> Seq.sortBy(fun c -> c.TargetChangeset.CreationDate)
-    //    |> Seq.iter( fun c-> printfn "%A %A %A" (c.TargetChangeset.CreationDate.ToString()) c.TargetChangeset.ChangesetId c.SourceVersion )
+        |> Seq.map(fun (target, source) -> 
+                (target, source |> Seq.map(fun s -> qualifContext.VersionControlServer.GetChangeset(s.SourceVersion))))
 
     // Livré toujours en resolved
     let latestLivraison = 
         qualifContext.BuildServer.QueryBuilds("Front Office 5.0", "OrderPipe_R7")
-        |> Seq.find(fun b-> b.BuildNumber = "OrderPipe_R7_v1.0.0.297.01")
+        |> Seq.find(fun b-> b.BuildNumber = "OrderPipe_R7_v1.0.0.301.01")
 
-    type ChangesetWithMerges = 
-        {
-            Changeset:Changeset
-            MergedChangesets:seq<Changeset>
-        }
+    let getMergedWorkItems id = 
+        let mergedChangesets = 
+            mergeHistory 
+            |> Seq.tryFind(fun (k,v)->k = id)
+        match mergedChangesets with
+        | Some m ->
+                    let (k:int),(v:seq<Changeset>)=m
+                    v 
+                    |> Seq.map( fun c -> c.AssociatedWorkItems) 
+                    |> Seq.concat
+        | None -> Seq.empty
 
     qualifContext.History
-        |> Seq.filter( fun h -> 
-            if h.ChangesetId <= System.Convert.ToInt32(latestLivraison.SourceGetVersion.Replace("C","")) 
+        |> Seq.map( fun h -> 
+            if h.ChangesetId <= System.Convert.ToInt32(latestLivraison.SourceGetVersion.Replace("C",""))
                 then 
-                    h.AssociatedWorkItems |> Seq.exists(fun w->w.State = "Resolved" ) 
-                else false
-                )
-        |> Seq.map( fun h-> h.AssociatedWorkItems |> Seq.filter(fun w->w.State = "Resolved" ))
+                    let allWorkItems = h.AssociatedWorkItems |> Seq.append (getMergedWorkItems h.ChangesetId)
+                    allWorkItems |> Seq.filter(fun w->w.State = "Resolved")
+                else Seq.empty
+                  )
         |> Seq.concat
         |> Seq.distinctBy( fun h-> h.Id)
         |> Seq.iter( fun h-> printfn "%A %A" h.Id h.Title )
+    
+    qualifContext.History |> Seq.length

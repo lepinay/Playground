@@ -1,0 +1,29 @@
+﻿<header>
+    <div class="content-wrapper">
+        <div class="float-left">
+            <p class="site-title">
+                <a href="~/"></a></p>
+        </div>
+    </div>
+</header>
+<div id="body" ng-app>
+    <div ng-controller="HomeCtrl">
+        <ul id="builds">
+        </ul>
+        <ul id="mine">
+        </ul>
+    </div>
+    <script src="~/Scripts/jquery-1.7.1.min.js"></script>
+    
+    <script type="text/javascript">
+        function HomeCtrl($scope, $http) {
+            $http.get("/api/builds/get", function (data) {
+                $scope.builds = data;
+            });
+            $http.get("/api/livraisons/get", function (data) {
+                $scope.livraisons = data;
+            });
+        }
+    </script>
+    <script src="~/Scripts/angular.min.js"></script>
+</div>

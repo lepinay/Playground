@@ -32,3 +32,74 @@ module TFS =
                         |> Seq.filter(fun h-> not(h.Committer.Contains("svc_TfsService")) )
                         |> Seq.toList
         }
+
+    let getBuildsLabels = 
+        let cache = ref []
+        
+
+        fun src ->
+            let ctx = 
+                createContext src
+            match !cache with
+                |[] ->
+                    let res = 
+                        ctx.BuildServer.QueryBuilds("Front Office 5.0", "OrderPipe_R7")
+                        |> Seq.sortBy( fun b->b.StartTime)
+                        |> Seq.toList
+                        |> List.rev
+                        |> Seq.map( fun b -> b.BuildNumber)
+                        |> Seq.toList
+                    cache := res
+                    res
+                |c-> c
+
+
+    open System.Text.RegularExpressions
+    
+    let (|Integer|_|) (str: string) =
+       let mutable intvalue = 0
+       if System.Int32.TryParse(str, &intvalue) then Some(intvalue)
+       else None
+
+    let (|Float|_|) (str: string) =
+       let mutable floatvalue = 0.0
+       if System.Double.TryParse(str, &floatvalue) then Some(floatvalue)
+       else None
+
+    let (|ParseRegex|_|) regex str =
+       let m = Regex(regex).Match(str)
+       if m.Success
+       then Some (List.tail [ for x in m.Groups -> x.Value ])
+       else None
+
+
+    let parseDate str =
+       match str with
+         | ParseRegex "(\d{1,2})/(\d{1,2})/(\d{1,2})$" [Integer m; Integer d; Integer y]
+              -> new System.DateTime(y + 2000, m, d)
+         | ParseRegex "(\d{1,2})/(\d{1,2})/(\d{3,4})" [Integer m; Integer d; Integer y]
+              -> new System.DateTime(y, m, d)
+         | ParseRegex "(\d{1,4})-(\d{1,2})-(\d{1,2})" [Integer y; Integer m; Integer d]
+              -> new System.DateTime(y, m, d)
+         | _ -> new System.DateTime()
+
+    let dt1 = parseDate "12/22/08" 
+    let dt2 = parseDate "1/1/2009" 
+    let dt3 = parseDate "2008-1-15" 
+    let dt4 = parseDate "1995-12-28"
+
+    printfn "%s %s %s %s" (dt1.ToString()) (dt2.ToString()) (dt3.ToString()) (dt4.ToString())
+
+    open System.Reflection
+    open Microsoft.FSharp.Reflection
+    let myFunc a b = a+b+1+2+4+10
+    let toto = 3
+    
+    System.Reflection.Assembly.GetExecutingAssembly().GetTypes()
+        |> Seq.iter(fun t -> 
+                printfn "%A" t.Name
+                t.GetMethods()
+                |> Seq.filter(fun m -> m = myFunc.GetType()) 
+                |> Seq.iter(fun m ->printfn "   %A" m.Name)  )
+
+

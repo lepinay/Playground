@@ -7,6 +7,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tutorial1", "Tutorial1\Tuto
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TFS", "TFS\TFS.fsproj", "{23711FFE-DF99-42D2-8C6F-B5AC1D319D29}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebClient", "WebClient\WebClient.csproj", "{4BC763BA-C3C8-4D12-89B5-DB2C46BEE676}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{23711FFE-DF99-42D2-8C6F-B5AC1D319D29}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{23711FFE-DF99-42D2-8C6F-B5AC1D319D29}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{23711FFE-DF99-42D2-8C6F-B5AC1D319D29}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4BC763BA-C3C8-4D12-89B5-DB2C46BEE676}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4BC763BA-C3C8-4D12-89B5-DB2C46BEE676}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4BC763BA-C3C8-4D12-89B5-DB2C46BEE676}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4BC763BA-C3C8-4D12-89B5-DB2C46BEE676}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -90,72 +90,11 @@ module TFS =
 
     printfn "%s %s %s %s" (dt1.ToString()) (dt2.ToString()) (dt3.ToString()) (dt4.ToString())
 
-module Other =
-    let myFunc a b = (a+b+1+2+4).ToString()
 
-module Reflect =
-    open System.Reflection
-    open Microsoft.FSharp.Reflection
-    let myFunc a b = (a+b+1+2+4+10+55).ToString()
-    let toto = 3
-    
-    let a = System.Reflection.Assembly.GetExecutingAssembly()
-    a.GetTypes()
-        |> Seq.map(fun t -> 
-                t.GetMethods()
-                |> Seq.filter(fun m -> 
-                    m.Name = "myFunc" && m.ReturnType = typeof<string>  ))
-        |> Seq.concat
-        |> Seq.iter(fun m ->printfn "  %A %A %A %A %A" m.DeclaringType.FullName (m.Invoke(null,[|1;2|])) m.Name (m.GetParameters()) m.ReturnType )  
                 
 
 
-module Web =
-    open System.Text.RegularExpressions
-    open System.Reflection
-    open Microsoft.FSharp.Reflection
-    open System.Web
-    open System.Net
 
-    type Parm = 
-        {
-            Name:string
-            Value:string
-        }
-
-    type Request = 
-        {
-            Path:string
-            Parms:List<Parm>
-        }
-
-    let (|Get|) path parms request =
-        if path = request.Path then
-            if parms |> Seq.forall( fun p-> request.Parms |> Seq.exists(fun pp -> p = pp)) then
-                parms
-                |> Seq.map( fun p -> request.Parms |> Seq.find( fun pp -> p = pp ).Value)
-        []
-
-    let (|Post|) path parms request =
-        []
-
-    let view id = 
-        printfn "GET %A" id
-        id.ToString()
-
-    let post id name =
-        printfn "Posted: %A %A" id name
-        ""
-
-    let index =
-        printfn "GET"
-        "index"
-
-    let handleRequest request = 
-        match request with
-            | Get "/home/index" [] [] -> index
-            | Get "/home/view" ["id"] [id] -> view id
-            | Post "/home/post" ["id","name"] [id;name] -> post id name
         
         
 
